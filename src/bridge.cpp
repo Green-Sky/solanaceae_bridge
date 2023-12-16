@@ -58,13 +58,23 @@ Bridge::Bridge(
 ) : _cr(cr), _rmm(rmm), _conf(conf) {
 	_rmm.subscribe(this, enumType::message_construct);
 
+	if (!_conf.has_bool("Bridge", "username_angle_brackets")) {
+		_conf.set("Bridge", "username_angle_brackets", true);
+	}
+	if (!_conf.has_bool("Bridge", "username_id")) {
+		_conf.set("Bridge", "username_id", true);
+	}
+	if (!_conf.has_bool("Bridge", "username_colon")) {
+		_conf.set("Bridge", "username_colon", true);
+	}
+
 	// load synced contacts (bridged groups)
 	std::map<std::string, size_t> tmp_name_to_id;
 	for (const auto [contact_id, vgroup_str] : _conf.entries_string("Bridge", "contact_to_vgroup")) {
 		const auto tmp_vgroup_str = std::string{vgroup_str.start, vgroup_str.start+vgroup_str.extend};
 		if (!tmp_name_to_id.count(tmp_vgroup_str)) {
 			tmp_name_to_id[tmp_vgroup_str] = _vgroups.size();
-			_vgroups.emplace_back();;
+			_vgroups.emplace_back().vg_name = tmp_vgroup_str;
 		}
 		auto& v_group = _vgroups.at(tmp_name_to_id.at(tmp_vgroup_str));
 
@@ -148,25 +158,42 @@ bool Bridge::onEvent(const Message::Events::MessageConstruct& e) {
 	const auto& message_text = e.e.get<Message::Components::MessageText>().text;
 	const bool is_action = e.e.all_of<Message::Components::TagMessageIsAction>();
 
+	const bool use_angle_brackets = _conf.get_bool("Bridge", "username_angle_brackets", vgroup.vg_name).value();
+
 	std::string from_str;
+	if (use_angle_brackets) {
+		from_str += "<";
+	}
+
 	if (_cr.all_of<Contact::Components::Name>(contact_from)) {
 		const auto& name = _cr.get<Contact::Components::Name>(contact_from).name;
 		if (name.empty()) {
-			from_str += "<UNK";
+			from_str += "UNK";
 		} else {
-			from_str += "<";
 			from_str += name.substr(0, 16);
 		}
 	}
-	if (_cr.all_of<Contact::Components::ID>(contact_from)) {
-		// copy
-		auto id = _cr.get<Contact::Components::ID>(contact_from).data;
-		id.resize(3);
 
-		from_str += "#" + bin2hex(id);
+	if (_conf.get_bool("Bridge", "username_id", vgroup.vg_name).value()) {
+		if (_cr.all_of<Contact::Components::ID>(contact_from)) {
+			// copy
+			auto id = _cr.get<Contact::Components::ID>(contact_from).data;
+			id.resize(3); // TODO:make size configurable
+
+			// TODO: make seperator configurable
+			from_str += "#" + bin2hex(id);
+		}
 	}
 
-	from_str += "> ";
+	if (use_angle_brackets) {
+		from_str += ">";
+	}
+
+	if (_conf.get_bool("Bridge", "username_colon", vgroup.vg_name).value()) {
+		from_str += ":";
+	}
+
+	from_str += " ";
 
 	// for each c in vg not c...
 	for (const auto& other_vc : vgroup.contacts) {

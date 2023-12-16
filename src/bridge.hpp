@@ -22,7 +22,8 @@ class Bridge : public RegistryMessageModelEventI {
 		};
 		std::vector<VContact> contacts;
 
-		// metadata/settings?
+		std::string vg_name;
+		// TODO: cache settings here?
 	};
 	std::vector<VirtualGroups> _vgroups;
 	std::map<Contact3Handle, size_t> _c_to_vg;

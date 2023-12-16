@@ -1,11 +1,12 @@
 #pragma once
 
-#include <cstdint>
 #include <solanaceae/message3/registry_message_model.hpp>
 #include <solanaceae/contact/contact_model3.hpp>
 
 #include <vector>
 #include <map>
+#include <string>
+#include <cstdint>
 
 // fwd
 struct ConfigModelI;

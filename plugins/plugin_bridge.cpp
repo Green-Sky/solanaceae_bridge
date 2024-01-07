@@ -3,6 +3,7 @@
 #include "../src/bridge.hpp"
 
 #include <memory>
+#include <limits>
 #include <iostream>
 
 #define RESOLVE_INSTANCE(x) static_cast<x*>(solana_api->resolveInstance(#x))
@@ -68,11 +69,13 @@ SOLANA_PLUGIN_EXPORT void solana_plugin_stop(void) {
 	g_bridge.reset();
 }
 
-SOLANA_PLUGIN_EXPORT void solana_plugin_tick(float delta) {
-	(void)delta;
-	//std::cout << "PLUGIN Bridge TICK()\n";
+SOLANA_PLUGIN_EXPORT float solana_plugin_tick(float delta) {
 	g_bridge->iterate(delta);
+
+	return std::numeric_limits<float>::max();
 }
+
+// no render
 
 } // extern C
 

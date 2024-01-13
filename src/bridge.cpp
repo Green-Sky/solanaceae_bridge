@@ -1,55 +1,11 @@
 #include "./bridge.hpp"
 
 #include <solanaceae/util/config_model.hpp>
+#include <solanaceae/util/utils.hpp>
 #include <solanaceae/contact/components.hpp>
 #include <solanaceae/message3/components.hpp>
 
 #include <iostream>
-
-namespace detail {
-	constexpr uint8_t nib_from_hex(char c) {
-		assert((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'));
-
-		if (c >= '0' && c <= '9') {
-			return static_cast<uint8_t>(c) - '0';
-		} else if (c >= 'a' && c <= 'f') {
-			return (static_cast<uint8_t>(c) - 'a') + 10u;
-		} else {
-			return 0u;
-		}
-	}
-
-	constexpr char nib_to_hex(uint8_t c) {
-		assert(c <= 0x0f);
-
-		if (c <= 0x09) {
-			return c + '0';
-		} else {
-			return (c - 10u) + 'a';
-		}
-	}
-} // detail
-
-static std::vector<uint8_t> hex2bin(const std::string_view str) {
-	assert(str.size() % 2 == 0);
-	std::vector<uint8_t> bin{};
-	bin.resize(str.size()/2, 0);
-
-	for (size_t i = 0; i < bin.size(); i++) {
-		bin[i] = detail::nib_from_hex(str[i*2]) << 4 | detail::nib_from_hex(str[i*2+1]);
-	}
-
-	return bin;
-}
-
-static std::string bin2hex(const std::vector<uint8_t> data) {
-	std::string str;
-	for (size_t i = 0; i < data.size(); i++) {
-		str.push_back(detail::nib_to_hex(data[i] >> 4));
-		str.push_back(detail::nib_to_hex(data[i] & 0x0f));
-	}
-	return str;
-}
 
 Bridge::Bridge(
 	Contact3Registry& cr,

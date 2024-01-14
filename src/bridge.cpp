@@ -152,7 +152,7 @@ void Bridge::registerCommands(void) {
 							"    '" +
 							(_cr.all_of<Contact::Components::Name>(sub_c) ? _cr.get<Contact::Components::Name>(sub_c).name : "<unk>") +
 							"'" +
-							(_cr.all_of<Contact::Components::ID>(sub_c) ? " id:" + bin2hex(vgc.id) : "")
+							(_cr.all_of<Contact::Components::ID>(sub_c) ? " id:" + bin2hex(_cr.get<Contact::Components::ID>(sub_c).data) : "")
 						);
 					}
 

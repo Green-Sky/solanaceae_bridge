@@ -95,35 +95,53 @@ void Bridge::registerCommands(void) {
 			const auto contact_from = m.get<Message::Components::ContactFrom>().c;
 			const auto contact_to = m.get<Message::Components::ContactTo>().c;
 
-			// TODO: if no vgroup name supplied
-
 			Contact3Handle group_contact;
-			if (/*is public ?*/ _c_to_vg.count({_cr, contact_to})) {
-				// message was sent public in group
-				group_contact = {_cr, contact_to};
-			} else if (_cr.all_of<Contact::Components::Parent>(contact_from)) {
-				// use parent of sender
-				group_contact = {_cr, _cr.get<Contact::Components::Parent>(contact_from).parent};
-			} else if (false /* parent of contact_to ? */) {
+			const VirtualGroups* vg = nullptr;
+
+			if (!params.empty()) { // vgroup_name supplied
+				for (const auto& vg_it : _vgroups) {
+					if (vg_it.vg_name == params) {
+						vg = &vg_it;
+						break;
+					}
+				}
+				if (vg == nullptr) {
+					_rmm.sendText(
+						contact_from,
+						"The supplied vgroup name does not exist!"
+					);
+					return true;
+				}
+			} else {
+				if (/*is public ?*/ _c_to_vg.count({_cr, contact_to})) {
+					// message was sent public in group
+					group_contact = {_cr, contact_to};
+				} else if (_cr.all_of<Contact::Components::Parent>(contact_from)) {
+					// use parent of sender
+					group_contact = {_cr, _cr.get<Contact::Components::Parent>(contact_from).parent};
+				} else if (false /* parent of contact_to ? */) {
+				}
+
+				if (!_c_to_vg.count(group_contact)) {
+					// nope
+					_rmm.sendText(
+						contact_from,
+						"It appears you are not bridged or forgot to supply the vgroup name!"
+					);
+					return true;
+				}
+
+				assert(static_cast<bool>(group_contact));
+				vg = &_vgroups.at(_c_to_vg.at(group_contact));
 			}
 
-			if (!_c_to_vg.count(group_contact)) {
-				// nope
-				_rmm.sendText(
-					contact_from,
-					"It appears you are not bridged or forgot to supply the vgroup name!"
-				);
-				return true;
-			}
-
-			assert(static_cast<bool>(group_contact));
-			const auto& vg = _vgroups.at(_c_to_vg.at(group_contact));
+			assert(vg != nullptr);
 
 			_rmm.sendText(
 				contact_from,
-				"Contacts online in other bridged group(s) in vgroup '" + vg.vg_name + "'"
+				"Contacts online in other bridged group(s) in vgroup '" + vg->vg_name + "'"
 			);
-			for (const auto& vgc : vg.contacts) {
+			for (const auto& vgc : vg->contacts) {
 				if (vgc.c == group_contact) {
 					// skip self
 					continue;

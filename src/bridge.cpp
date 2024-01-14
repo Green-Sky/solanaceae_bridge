@@ -4,14 +4,16 @@
 #include <solanaceae/util/utils.hpp>
 #include <solanaceae/contact/components.hpp>
 #include <solanaceae/message3/components.hpp>
+#include <solanaceae/message3/message_command_dispatcher.hpp>
 
 #include <iostream>
 
 Bridge::Bridge(
 	Contact3Registry& cr,
 	RegistryMessageModel& rmm,
-	ConfigModelI& conf
-) : _cr(cr), _rmm(rmm), _conf(conf) {
+	ConfigModelI& conf,
+	MessageCommandDispatcher* mcd
+) : _cr(cr), _rmm(rmm), _conf(conf), _mcd(mcd) {
 	_rmm.subscribe(this, enumType::message_construct);
 
 	if (!_conf.has_bool("Bridge", "username_angle_brackets")) {
@@ -40,6 +42,8 @@ Bridge::Bridge(
 	}
 
 	updateVGroups();
+
+	registerCommands();
 }
 
 Bridge::~Bridge(void) {
@@ -77,6 +81,101 @@ void Bridge::updateVGroups(void) {
 			}
 		}
 	}
+}
+
+void Bridge::registerCommands(void) {
+	if (_mcd == nullptr) {
+		return;
+	}
+
+	_mcd->registerCommand(
+		"Bridge", "bridge",
+		"users",
+		[this](std::string_view params, Message3Handle m) -> bool {
+			const auto contact_from = m.get<Message::Components::ContactFrom>().c;
+			const auto contact_to = m.get<Message::Components::ContactTo>().c;
+
+			// TODO: if no vgroup name supplied
+
+			Contact3Handle group_contact;
+			if (/*is public ?*/ _c_to_vg.count({_cr, contact_to})) {
+				// message was sent public in group
+				group_contact = {_cr, contact_to};
+			} else if (_cr.all_of<Contact::Components::Parent>(contact_from)) {
+				// use parent of sender
+				group_contact = {_cr, _cr.get<Contact::Components::Parent>(contact_from).parent};
+			} else if (false /* parent of contact_to ? */) {
+			}
+
+			if (!_c_to_vg.count(group_contact)) {
+				// nope
+				_rmm.sendText(
+					contact_from,
+					"It appears you are not bridged or forgot to supply the vgroup name!"
+				);
+				return true;
+			}
+
+			assert(static_cast<bool>(group_contact));
+			const auto& vg = _vgroups.at(_c_to_vg.at(group_contact));
+
+			_rmm.sendText(
+				contact_from,
+				"Contacts online in other bridged group(s) in vgroup '" + vg.vg_name + "'"
+			);
+			for (const auto& vgc : vg.contacts) {
+				if (vgc.c == group_contact) {
+					// skip self
+					continue;
+				}
+
+				if (vgc.c.all_of<Contact::Components::ParentOf>()) {
+					_rmm.sendText(
+						contact_from,
+						"  online in '" +
+						(vgc.c.all_of<Contact::Components::Name>() ? vgc.c.get<Contact::Components::Name>().name : "<unk>") +
+						"' id:" + bin2hex(vgc.id)
+					);
+
+					// for each sub contact
+					for (const auto& sub_c : vgc.c.get<Contact::Components::ParentOf>().subs) {
+						if (
+							const auto* sub_cs = _cr.try_get<Contact::Components::ConnectionState>(sub_c);
+							sub_cs != nullptr && sub_cs->state == Contact::Components::ConnectionState::disconnected
+						) {
+							// skip offline
+							continue;
+						}
+
+						_rmm.sendText(
+							contact_from,
+							"    '" +
+							(_cr.all_of<Contact::Components::Name>(sub_c) ? _cr.get<Contact::Components::Name>(sub_c).name : "<unk>") +
+							"'" +
+							(_cr.all_of<Contact::Components::ID>(sub_c) ? " id:" + bin2hex(vgc.id) : "")
+						);
+					}
+
+				} else { // contact without parent
+					_rmm.sendText(
+						contact_from,
+						"  online contact '" +
+						(vgc.c.all_of<Contact::Components::Name>() ? vgc.c.get<Contact::Components::Name>().name : "<unk>") +
+						"' id:" + bin2hex(vgc.id)
+					);
+				}
+			}
+			return true;
+		},
+		"List users connected in the other bridged group(s).",
+		MessageCommandDispatcher::Perms::EVERYONE // TODO: should proably be MODERATOR
+	);
+
+	std::cout << "Bridge: registered commands\n";
+}
+
+const Bridge::VirtualGroups* Bridge::findVGforContact(const Contact3Handle& c) {
+	return nullptr;
 }
 
 bool Bridge::onEvent(const Message::Events::MessageConstruct& e) {

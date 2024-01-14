@@ -1,7 +1,7 @@
 #pragma once
 
-#include <solanaceae/message3/registry_message_model.hpp>
 #include <solanaceae/contact/contact_model3.hpp>
+#include <solanaceae/message3/registry_message_model.hpp>
 
 #include <vector>
 #include <map>
@@ -10,11 +10,13 @@
 
 // fwd
 struct ConfigModelI;
+class MessageCommandDispatcher;
 
 class Bridge : public RegistryMessageModelEventI {
 	Contact3Registry& _cr;
 	RegistryMessageModel& _rmm;
 	ConfigModelI& _conf;
+	MessageCommandDispatcher* _mcd;
 
 	struct VirtualGroups {
 		struct VContact {
@@ -35,7 +37,8 @@ class Bridge : public RegistryMessageModelEventI {
 		Bridge(
 			Contact3Registry& cr,
 			RegistryMessageModel& rmm,
-			ConfigModelI& conf
+			ConfigModelI& conf,
+			MessageCommandDispatcher* mcd = nullptr
 		);
 		~Bridge(void);
 
@@ -43,6 +46,8 @@ class Bridge : public RegistryMessageModelEventI {
 
 	private:
 		void updateVGroups(void);
+		void registerCommands(void);
+		const VirtualGroups* findVGforContact(const Contact3Handle& c);
 
 	protected: // mm
 		bool onEvent(const Message::Events::MessageConstruct& e) override;

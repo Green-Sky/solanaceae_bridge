@@ -28,14 +28,16 @@ SOLANA_PLUGIN_EXPORT uint32_t solana_plugin_start(struct SolanaAPI* solana_api) 
 		return 1;
 	}
 
-	Contact3Registry* cr;
+	Contact3Registry* cr = nullptr;
 	RegistryMessageModel* rmm = nullptr;
 	ConfigModelI* conf = nullptr;
+	MessageCommandDispatcher* mcd = nullptr;
 
 	{ // make sure required types are loaded
 		cr = RESOLVE_INSTANCE(Contact3Registry);
 		rmm = RESOLVE_INSTANCE(RegistryMessageModel);
 		conf = RESOLVE_INSTANCE(ConfigModelI);
+		mcd = RESOLVE_INSTANCE(MessageCommandDispatcher);
 
 		if (cr == nullptr) {
 			std::cerr << "PLUGIN Bridge missing Contact3Registry\n";
@@ -51,11 +53,13 @@ SOLANA_PLUGIN_EXPORT uint32_t solana_plugin_start(struct SolanaAPI* solana_api) 
 			std::cerr << "PLUGIN Bridge missing ConfigModelI\n";
 			return 2;
 		}
+
+		// missing mcd is no error
 	}
 
 	// static store, could be anywhere tho
 	// construct with fetched dependencies
-	g_bridge = std::make_unique<Bridge>(*cr, *rmm, *conf);
+	g_bridge = std::make_unique<Bridge>(*cr, *rmm, *conf, mcd);
 
 	// register types
 	PROVIDE_INSTANCE(Bridge, "Bridge", g_bridge.get());

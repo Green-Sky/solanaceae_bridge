@@ -2,19 +2,20 @@
 
 #include "../src/bridge.hpp"
 
+#include <solanaceae/util/config_model.hpp>
+
 #include <memory>
 #include <limits>
 #include <iostream>
 
-#define RESOLVE_INSTANCE(x) static_cast<x*>(solana_api->resolveInstance(#x))
-#define PROVIDE_INSTANCE(x, p, v) solana_api->provideInstance(#x, p, static_cast<x*>(v))
-
 static std::unique_ptr<Bridge> g_bridge = nullptr;
+
+constexpr const char* plugin_name = "Bridge";
 
 extern "C" {
 
 SOLANA_PLUGIN_EXPORT const char* solana_plugin_get_name(void) {
-	return "Bridge";
+	return plugin_name;
 }
 
 SOLANA_PLUGIN_EXPORT uint32_t solana_plugin_get_version(void) {
@@ -22,59 +23,42 @@ SOLANA_PLUGIN_EXPORT uint32_t solana_plugin_get_version(void) {
 }
 
 SOLANA_PLUGIN_EXPORT uint32_t solana_plugin_start(struct SolanaAPI* solana_api) {
-	std::cout << "PLUGIN Bridge START()\n";
+	std::cout << "PLUGIN " << plugin_name << " START()\n";
 
 	if (solana_api == nullptr) {
 		return 1;
 	}
 
-	Contact3Registry* cr = nullptr;
-	RegistryMessageModel* rmm = nullptr;
-	ConfigModelI* conf = nullptr;
-	MessageCommandDispatcher* mcd = nullptr;
+	try {
+		auto* cr = PLUG_RESOLVE_INSTANCE_VERSIONED(Contact3Registry, "1");
+		auto* rmm = PLUG_RESOLVE_INSTANCE(RegistryMessageModel);
+		auto* conf = PLUG_RESOLVE_INSTANCE(ConfigModelI);
 
-	{ // make sure required types are loaded
-		cr = RESOLVE_INSTANCE(Contact3Registry);
-		rmm = RESOLVE_INSTANCE(RegistryMessageModel);
-		conf = RESOLVE_INSTANCE(ConfigModelI);
-		mcd = RESOLVE_INSTANCE(MessageCommandDispatcher);
+		// optional dep
+		auto* mcd = PLUG_RESOLVE_INSTANCE_OPT(MessageCommandDispatcher);
 
-		if (cr == nullptr) {
-			std::cerr << "PLUGIN Bridge missing Contact3Registry\n";
-			return 2;
-		}
+		// static store, could be anywhere tho
+		// construct with fetched dependencies
+		g_bridge = std::make_unique<Bridge>(*cr, *rmm, *conf, mcd);
 
-		if (rmm == nullptr) {
-			std::cerr << "PLUGIN Bridge missing RegistryMessageModel\n";
-			return 2;
-		}
-
-		if (conf == nullptr) {
-			std::cerr << "PLUGIN Bridge missing ConfigModelI\n";
-			return 2;
-		}
-
-		// missing mcd is no error
+		// register types
+		PLUG_PROVIDE_INSTANCE(Bridge, plugin_name, g_bridge.get());
+	} catch (const ResolveException& e) {
+		std::cerr << "PLUGIN " << plugin_name << " " << e.what << "\n";
+		return 2;
 	}
-
-	// static store, could be anywhere tho
-	// construct with fetched dependencies
-	g_bridge = std::make_unique<Bridge>(*cr, *rmm, *conf, mcd);
-
-	// register types
-	PROVIDE_INSTANCE(Bridge, "Bridge", g_bridge.get());
 
 	return 0;
 }
 
 SOLANA_PLUGIN_EXPORT void solana_plugin_stop(void) {
-	std::cout << "PLUGIN Bridge STOP()\n";
+	std::cout << "PLUGIN " << plugin_name << " STOP()\n";
 
 	g_bridge.reset();
 }
 
-SOLANA_PLUGIN_EXPORT float solana_plugin_tick(float delta) {
-	g_bridge->iterate(delta);
+SOLANA_PLUGIN_EXPORT float solana_plugin_tick(float time_delta) {
+	g_bridge->iterate(time_delta);
 
 	return std::numeric_limits<float>::max();
 }

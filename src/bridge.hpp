@@ -34,6 +34,8 @@ class Bridge : public RegistryMessageModelEventI {
 	float _iterate_timer {0.f};
 
 	public:
+		static constexpr const char* version {"1"};
+
 		Bridge(
 			Contact3Registry& cr,
 			RegistryMessageModel& rmm,

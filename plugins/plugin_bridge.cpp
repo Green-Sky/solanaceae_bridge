@@ -3,6 +3,7 @@
 #include "../src/bridge.hpp"
 
 #include <solanaceae/util/config_model.hpp>
+#include <solanaceae/message3/message_command_dispatcher.hpp>
 
 #include <memory>
 #include <limits>

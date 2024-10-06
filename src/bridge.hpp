@@ -14,7 +14,7 @@ class MessageCommandDispatcher;
 
 class Bridge : public RegistryMessageModelEventI {
 	Contact3Registry& _cr;
-	RegistryMessageModel& _rmm;
+	RegistryMessageModelI& _rmm;
 	ConfigModelI& _conf;
 	MessageCommandDispatcher* _mcd;
 
@@ -38,7 +38,7 @@ class Bridge : public RegistryMessageModelEventI {
 
 		Bridge(
 			Contact3Registry& cr,
-			RegistryMessageModel& rmm,
+			RegistryMessageModelI& rmm,
 			ConfigModelI& conf,
 			MessageCommandDispatcher* mcd = nullptr
 		);

@@ -10,7 +10,7 @@
 
 Bridge::Bridge(
 	Contact3Registry& cr,
-	RegistryMessageModel& rmm,
+	RegistryMessageModelI& rmm,
 	ConfigModelI& conf,
 	MessageCommandDispatcher* mcd
 ) : _cr(cr), _rmm(rmm), _conf(conf), _mcd(mcd) {

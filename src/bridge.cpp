@@ -13,8 +13,8 @@ Bridge::Bridge(
 	RegistryMessageModelI& rmm,
 	ConfigModelI& conf,
 	MessageCommandDispatcher* mcd
-) : _cr(cr), _rmm(rmm), _conf(conf), _mcd(mcd) {
-	_rmm.subscribe(this, enumType::message_construct);
+) : _cr(cr), _rmm(rmm), _rmm_sr(_rmm.newSubRef(this)), _conf(conf), _mcd(mcd) {
+	_rmm_sr.subscribe(RegistryMessageModel_Event::message_construct);
 
 	if (!_conf.has_bool("Bridge", "username_angle_brackets")) {
 		_conf.set("Bridge", "username_angle_brackets", true);

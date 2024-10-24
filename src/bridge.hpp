@@ -15,6 +15,7 @@ class MessageCommandDispatcher;
 class Bridge : public RegistryMessageModelEventI {
 	Contact3Registry& _cr;
 	RegistryMessageModelI& _rmm;
+	RegistryMessageModelI::SubscriptionReference _rmm_sr;
 	ConfigModelI& _conf;
 	MessageCommandDispatcher* _mcd;
 

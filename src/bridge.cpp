@@ -2,6 +2,7 @@
 
 #include <solanaceae/util/config_model.hpp>
 #include <solanaceae/util/utils.hpp>
+#include <solanaceae/util/time.hpp>
 #include <solanaceae/contact/components.hpp>
 #include <solanaceae/message3/components.hpp>
 #include <solanaceae/message3/message_command_dispatcher.hpp>
@@ -210,7 +211,7 @@ bool Bridge::onEvent(const Message::Events::MessageConstruct& e) {
 	}
 
 	if (e.e.all_of<Message::Components::Timestamp>()) {
-		int64_t time_diff = int64_t(Message::getTimeMS()) - int64_t(e.e.get<Message::Components::Timestamp>().ts);
+		int64_t time_diff = int64_t(getTimeMS()) - int64_t(e.e.get<Message::Components::Timestamp>().ts);
 		if (time_diff > 5*1000*60) {
 			return false; // message too old
 		}

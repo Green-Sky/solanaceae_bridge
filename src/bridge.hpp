@@ -1,6 +1,6 @@
 #pragma once
 
-#include <solanaceae/contact/contact_model3.hpp>
+#include <solanaceae/contact/fwd.hpp>
 #include <solanaceae/message3/registry_message_model.hpp>
 
 #include <vector>
@@ -13,7 +13,7 @@ struct ConfigModelI;
 class MessageCommandDispatcher;
 
 class Bridge : public RegistryMessageModelEventI {
-	Contact3Registry& _cr;
+	ContactStore4I& _cs;
 	RegistryMessageModelI& _rmm;
 	RegistryMessageModelI::SubscriptionReference _rmm_sr;
 	ConfigModelI& _conf;
@@ -21,7 +21,7 @@ class Bridge : public RegistryMessageModelEventI {
 
 	struct VirtualGroups {
 		struct VContact {
-			Contact3Handle c; // might be null
+			ContactHandle4 c; // might be null
 			std::vector<uint8_t> id; // if contact appears, we check
 		};
 		std::vector<VContact> contacts;
@@ -30,7 +30,7 @@ class Bridge : public RegistryMessageModelEventI {
 		// TODO: cache settings here?
 	};
 	std::vector<VirtualGroups> _vgroups;
-	std::map<Contact3Handle, size_t> _c_to_vg;
+	std::map<ContactHandle4, size_t> _c_to_vg;
 
 	float _iterate_timer {0.f};
 
@@ -38,7 +38,7 @@ class Bridge : public RegistryMessageModelEventI {
 		static constexpr const char* version {"1"};
 
 		Bridge(
-			Contact3Registry& cr,
+			ContactStore4I& cs,
 			RegistryMessageModelI& rmm,
 			ConfigModelI& conf,
 			MessageCommandDispatcher* mcd = nullptr
@@ -50,7 +50,7 @@ class Bridge : public RegistryMessageModelEventI {
 	private:
 		void updateVGroups(void);
 		void registerCommands(void);
-		const VirtualGroups* findVGforContact(const Contact3Handle& c);
+		const VirtualGroups* findVGforContact(const ContactHandle4& c);
 
 	protected: // mm
 		bool onEvent(const Message::Events::MessageConstruct& e) override;

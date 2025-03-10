@@ -3,6 +3,7 @@
 #include <solanaceae/util/config_model.hpp>
 #include <solanaceae/util/utils.hpp>
 #include <solanaceae/util/time.hpp>
+#include <solanaceae/contact/contact_store_i.hpp>
 #include <solanaceae/contact/components.hpp>
 #include <solanaceae/message3/components.hpp>
 #include <solanaceae/message3/message_command_dispatcher.hpp>
@@ -10,11 +11,11 @@
 #include <iostream>
 
 Bridge::Bridge(
-	Contact3Registry& cr,
+	ContactStore4I& cs,
 	RegistryMessageModelI& rmm,
 	ConfigModelI& conf,
 	MessageCommandDispatcher* mcd
-) : _cr(cr), _rmm(rmm), _rmm_sr(_rmm.newSubRef(this)), _conf(conf), _mcd(mcd) {
+) : _cs(cs), _rmm(rmm), _rmm_sr(_rmm.newSubRef(this)), _conf(conf), _mcd(mcd) {
 	_rmm_sr.subscribe(RegistryMessageModel_Event::message_construct);
 
 	if (!_conf.has_bool("Bridge", "username_angle_brackets")) {
@@ -38,7 +39,8 @@ Bridge::Bridge(
 		auto& v_group = _vgroups.at(tmp_name_to_id.at(tmp_vgroup_str));
 
 		auto& new_vgc = v_group.contacts.emplace_back();
-		new_vgc.c = {_cr, entt::null}; // this is annoying af
+		//new_vgc.c = {}; // TODO: does this work here?
+		new_vgc.c = _cs.contactHandle(entt::null);
 		new_vgc.id = hex2bin(contact_id);
 	}
 
@@ -67,10 +69,10 @@ void Bridge::updateVGroups(void) {
 
 			if (!vgc.c.valid()) {
 				// search
-				auto view = _cr.view<Contact::Components::TagBig, Contact::Components::ID>();
+				auto view = _cs.registry().view<Contact::Components::TagBig, Contact::Components::ID>();
 				for (const auto c : view) {
 					if (view.get<Contact::Components::ID>(c).data == vgc.id) {
-						vgc.c = {_cr, c};
+						vgc.c = _cs.contactHandle(c);
 						std::cout << "Bridge: found contact for vgroup\n";
 						break;
 					}
@@ -96,7 +98,7 @@ void Bridge::registerCommands(void) {
 			const auto contact_from = m.get<Message::Components::ContactFrom>().c;
 			const auto contact_to = m.get<Message::Components::ContactTo>().c;
 
-			Contact3Handle group_contact;
+			ContactHandle4 group_contact;
 			const VirtualGroups* vg = nullptr;
 
 			if (!params.empty()) { // vgroup_name supplied
@@ -114,12 +116,12 @@ void Bridge::registerCommands(void) {
 					return true;
 				}
 			} else {
-				if (/*is public ?*/ _c_to_vg.count({_cr, contact_to})) {
+				if (/*is public ?*/ _c_to_vg.count(_cs.contactHandle(contact_to))) {
 					// message was sent public in group
-					group_contact = {_cr, contact_to};
-				} else if (_cr.all_of<Contact::Components::Parent>(contact_from)) {
+					group_contact = _cs.contactHandle(contact_to);
+				} else if (_cs.registry().all_of<Contact::Components::Parent>(contact_from)) {
 					// use parent of sender
-					group_contact = {_cr, _cr.get<Contact::Components::Parent>(contact_from).parent};
+					group_contact = _cs.contactHandle(_cs.registry().get<Contact::Components::Parent>(contact_from).parent);
 				} else if (false /* parent of contact_to ? */) {
 				}
 
@@ -156,10 +158,12 @@ void Bridge::registerCommands(void) {
 						"' id:" + bin2hex(vgc.id)
 					);
 
+					const auto& cr = _cs.registry();
+
 					// for each sub contact
 					for (const auto& sub_c : vgc.c.get<Contact::Components::ParentOf>().subs) {
 						if (
-							const auto* sub_cs = _cr.try_get<Contact::Components::ConnectionState>(sub_c);
+							const auto* sub_cs = cr.try_get<Contact::Components::ConnectionState>(sub_c);
 							sub_cs != nullptr && sub_cs->state == Contact::Components::ConnectionState::disconnected
 						) {
 							// skip offline
@@ -169,9 +173,9 @@ void Bridge::registerCommands(void) {
 						_rmm.sendText(
 							contact_from,
 							"    '" +
-							(_cr.all_of<Contact::Components::Name>(sub_c) ? _cr.get<Contact::Components::Name>(sub_c).name : "<unk>") +
+							(cr.all_of<Contact::Components::Name>(sub_c) ? cr.get<Contact::Components::Name>(sub_c).name : "<unk>") +
 							"'" +
-							(_cr.all_of<Contact::Components::ID>(sub_c) ? " id:" + bin2hex(_cr.get<Contact::Components::ID>(sub_c).data) : "")
+							(cr.all_of<Contact::Components::ID>(sub_c) ? " id:" + bin2hex(cr.get<Contact::Components::ID>(sub_c).data) : "")
 						);
 					}
 
@@ -193,7 +197,7 @@ void Bridge::registerCommands(void) {
 	std::cout << "Bridge: registered commands\n";
 }
 
-const Bridge::VirtualGroups* Bridge::findVGforContact(const Contact3Handle& c) {
+const Bridge::VirtualGroups* Bridge::findVGforContact(const ContactHandle4& c) {
 	return nullptr;
 }
 
@@ -217,14 +221,16 @@ bool Bridge::onEvent(const Message::Events::MessageConstruct& e) {
 		}
 	}
 
+	const auto& cr = _cs.registry();
+
 	const auto contact_from = e.e.get<Message::Components::ContactFrom>().c;
-	if (_cr.any_of<Contact::Components::TagSelfStrong, Contact::Components::TagSelfWeak>(contact_from)) {
+	if (cr.any_of<Contact::Components::TagSelfStrong, Contact::Components::TagSelfWeak>(contact_from)) {
 		return false; // skip own messages
 	}
 
 	const auto contact_to = e.e.get<Message::Components::ContactTo>().c;
 	// if e.e <contact to> is in c to vg
-	const auto it = _c_to_vg.find(Contact3Handle{_cr, contact_to});
+	const auto it = _c_to_vg.find(_cs.contactHandle(contact_to));
 	if (it == _c_to_vg.cend()) {
 		return false; // contact is not bridged
 	}
@@ -239,8 +245,8 @@ bool Bridge::onEvent(const Message::Events::MessageConstruct& e) {
 		from_str += "<";
 	}
 
-	if (_cr.all_of<Contact::Components::Name>(contact_from)) {
-		const auto& name = _cr.get<Contact::Components::Name>(contact_from).name;
+	if (cr.all_of<Contact::Components::Name>(contact_from)) {
+		const auto& name = cr.get<Contact::Components::Name>(contact_from).name;
 		if (name.empty()) {
 			from_str += "UNK";
 		} else {
@@ -249,9 +255,9 @@ bool Bridge::onEvent(const Message::Events::MessageConstruct& e) {
 	}
 
 	if (_conf.get_bool("Bridge", "username_id", vgroup.vg_name).value()) {
-		if (_cr.all_of<Contact::Components::ID>(contact_from)) {
+		if (cr.all_of<Contact::Components::ID>(contact_from)) {
 			// copy
-			auto id = _cr.get<Contact::Components::ID>(contact_from).data;
+			auto id = cr.get<Contact::Components::ID>(contact_from).data;
 			id.resize(3); // TODO:make size configurable
 
 			// TODO: make seperator configurable

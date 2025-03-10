@@ -31,7 +31,7 @@ SOLANA_PLUGIN_EXPORT uint32_t solana_plugin_start(struct SolanaAPI* solana_api) 
 	}
 
 	try {
-		auto* cr = PLUG_RESOLVE_INSTANCE_VERSIONED(Contact3Registry, "1");
+		auto* cs = PLUG_RESOLVE_INSTANCE(ContactStore4I);
 		auto* rmm = PLUG_RESOLVE_INSTANCE(RegistryMessageModelI);
 		auto* conf = PLUG_RESOLVE_INSTANCE(ConfigModelI);
 
@@ -40,7 +40,7 @@ SOLANA_PLUGIN_EXPORT uint32_t solana_plugin_start(struct SolanaAPI* solana_api) 
 
 		// static store, could be anywhere tho
 		// construct with fetched dependencies
-		g_bridge = std::make_unique<Bridge>(*cr, *rmm, *conf, mcd);
+		g_bridge = std::make_unique<Bridge>(*cs, *rmm, *conf, mcd);
 
 		// register types
 		PLUG_PROVIDE_INSTANCE(Bridge, plugin_name, g_bridge.get());
